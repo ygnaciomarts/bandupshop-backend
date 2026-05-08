@@ -1,17 +1,17 @@
 const express = require('express');
 const pool = require('../config/database');
-const { optionalAuth } = require('../middleware/auth');
+const { optionalAuth, requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
 // GET /api/cart
-router.get('/', optionalAuth, (req, res) => {
+router.get('/', requireAuth, (req, res) => {
   // Cart is managed client-side with localStorage
   res.json({ items: [], total: 0, total_items: 0 });
 });
 
 // POST /api/cart/add
-router.post('/add', async (req, res) => {
+router.post('/add', requireAuth, async (req, res) => {
   try {
     const { product_id, qty = 1 } = req.body;
     const productId = parseInt(product_id);
@@ -53,7 +53,7 @@ router.post('/add', async (req, res) => {
 });
 
 // PUT /api/cart/update
-router.put('/update', (req, res) => {
+router.put('/update', requireAuth, (req, res) => {
   const { product_id, qty } = req.body;
 
   if (!product_id) {
@@ -68,7 +68,7 @@ router.put('/update', (req, res) => {
 });
 
 // DELETE /api/cart/remove/:id
-router.delete('/remove/:id', (req, res) => {
+router.delete('/remove/:id', requireAuth, (req, res) => {
   const { id } = req.params;
   if (!id) {
     return res.status(400).json({ error: 'ID es requerido' });
@@ -77,7 +77,7 @@ router.delete('/remove/:id', (req, res) => {
 });
 
 // DELETE /api/cart/clear
-router.delete('/clear', (req, res) => {
+router.delete('/clear', requireAuth, (req, res) => {
   res.json({ message: 'Carrito vaciado' });
 });
 

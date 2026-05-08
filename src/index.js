@@ -31,29 +31,36 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/cart', cartRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/user', userRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/auth', authRoutes);
+app.use('/products', productRoutes);
+app.use('/cart', cartRoutes);
+app.use('/orders', orderRoutes);
+app.use('/user', userRoutes);
+app.use('/admin', adminRoutes);
 
 // Health check
-app.get('/api', (req, res) => {
-  res.json({ message: 'BandUp Shop API v2.0', status: 'ok' });
+app.get('/', (req, res) => {
+  res.json({
+    name: 'BandUp Shop API',
+    version: '2.0',
+    status: 'online'
+  });
 });
 
 // 404
 app.use((req, res) => {
-  res.status(404).json({ error: 'Endpoint no encontrado' });
+  res.status(404).json({ error: 'Endpoint not found' });
 });
 
 // Error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ error: 'Error interno del servidor' });
+  res.status(500).json({
+    error: 'Internal server error',
+    details: err.message
+  });
 });
 
 app.listen(PORT, () => {
-  console.log(`BandUp API corriendo en puerto ${PORT}`);
+  console.log(`BandUp API running on port ${PORT}`);
 });

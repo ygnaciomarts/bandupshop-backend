@@ -25,7 +25,7 @@ router.get('/profile', requireAuth, async (req, res) => {
 });
 
 // POST /api/user/reset-password
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', requireAuth, async (req, res) => {
   const { email } = req.body;
 
   if (!email) {

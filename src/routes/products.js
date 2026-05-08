@@ -5,20 +5,44 @@ const { requireAuth } = require('../middleware/auth');
 const router = express.Router();
 
 function formatProduct(row) {
-  const precioV = parseFloat(row.precioV) || 0;
-  const precioD = parseFloat(row.precioD) || 0;
-  const hasDiscount = precioD > 0;
+  const priceOriginal = parseFloat(row.price_original) || 0;
+  const priceFinal = parseFloat(row.price_final) || priceOriginal;
 
   return {
     id: row.id,
-    nombre: row.nombre,
-    artista: row.artista,
-    tipo: row.tipo || '',
-    precioOriginal: precioV,
-    precioDescuento: hasDiscount ? precioD : null,
-    precio: hasDiscount ? precioD : precioV,
-    cover: row.img ? Buffer.from(row.img).toString('base64') : null,
-    existencias: row.existencias || 0
+    sku: row.sku,
+    barcode: row.barcode,
+
+    title: row.title,
+    artist: row.artist,
+    type: row.type || 'CD',
+
+    description: row.description || '',
+
+    price: {
+      original: priceOriginal,
+      final: priceFinal,
+      currency: row.currency || 'MXN'
+    },
+
+    stock: row.stock || 0,
+    reservedStock: row.reserved_stock || 0,
+
+    coverImage: row.coverImage || null,
+
+    reservedStock: row.reservedStock || 0,
+
+    isActive: Boolean(row.isActive),
+    isFeatured: Boolean(row.isFeatured),
+
+    price: {
+      original: row.price_original,
+      final: row.price_final,
+      currency: row.currency
+    },
+
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
   };
 }
 
@@ -28,23 +52,23 @@ router.get('/', async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
-    const tipo = req.query.tipo || null;
+    const type = req.query.type || null;
 
     let where = '';
     const params = [];
 
-    if (tipo) {
-      where = 'WHERE tipo = ?';
-      params.push(tipo);
+    if (type) {
+      where = 'WHERE type = ?';
+      params.push(type);
     }
 
     // Count
-    const [countResult] = await pool.query(`SELECT COUNT(*) as total FROM productos ${where}`, params);
+    const [countResult] = await pool.query(`SELECT COUNT(*) as total FROM products ${where}`, params);
     const total = countResult[0].total;
 
     // Products
     const [products] = await pool.query(
-      `SELECT id, nombre, artista, tipo, precioV, precioD, existencias, img FROM productos ${where} ORDER BY id DESC LIMIT ? OFFSET ?`,
+      `SELECT * FROM products ${where} ORDER BY id DESC LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
 
@@ -59,7 +83,10 @@ router.get('/', async (req, res) => {
     });
   } catch (err) {
     console.error('Products index error:', err);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    res.status(500).json({
+      error: 'Internal server error',
+      details: err.message
+    });
   }
 });
 
@@ -67,19 +94,22 @@ router.get('/', async (req, res) => {
 router.get('/featured', async (req, res) => {
   try {
     let [products] = await pool.query(
-      'SELECT p.id, p.nombre, p.artista, p.tipo, p.precioV, p.precioD, p.existencias, p.img FROM novedades n JOIN productos p ON n.id = p.id LIMIT 20'
+      'SELECT * FROM products WHERE isFeatured = 1 LIMIT 20'
     );
 
     if (products.length === 0) {
       [products] = await pool.query(
-        'SELECT id, nombre, artista, tipo, precioV, precioD, img FROM novedades LIMIT 20'
+        'SELECT * FROM products ORDER BY rating DESC LIMIT 20'
       );
     }
 
     res.json({ products: products.map(formatProduct) });
   } catch (err) {
     console.error('Featured error:', err);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    res.status(500).json({
+      error: 'Internal server error',
+      details: err.message
+    });
   }
 });
 
@@ -93,14 +123,21 @@ router.get('/search', async (req, res) => {
 
     const searchTerm = `%${q}%`;
     const [products] = await pool.query(
-      'SELECT id, nombre, artista, tipo, precioV, precioD, existencias, img FROM productos WHERE nombre LIKE ? OR artista LIKE ? LIMIT 50',
-      [searchTerm, searchTerm]
+      `SELECT * FROM products
+       WHERE title LIKE ?
+       OR artist LIKE ?
+       OR sku LIKE ?
+       LIMIT 50`,
+      [searchTerm, searchTerm, searchTerm]
     );
 
     res.json({ products: products.map(formatProduct) });
   } catch (err) {
     console.error('Search error:', err);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    res.status(500).json({
+      error: 'Internal server error',
+      details: err.message
+    });
   }
 });
 
@@ -108,22 +145,22 @@ router.get('/search', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [rows] = await pool.query('SELECT * FROM productos WHERE id = ?', [id]);
+    const [rows] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
     const row = rows[0];
 
     if (!row) {
-      return res.status(404).json({ error: 'Producto no encontrado' });
+      return res.status(404).json({ error: 'Product not found' });
     }
 
     const product = formatProduct(row);
-    product.descripcion = row.descripcion || '';
-    product.tracklist = row.tracklist || '';
-    product.existencias = row.existencias || 0;
 
     res.json(product);
   } catch (err) {
     console.error('Product show error:', err);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    res.status(500).json({
+      error: 'Internal server error',
+      details: err.message
+    });
   }
 });
 
@@ -134,18 +171,21 @@ router.post('/:id/rate', requireAuth, async (req, res) => {
     const { rating } = req.body;
 
     if (!rating || rating < 1 || rating > 5) {
-      return res.status(400).json({ error: 'Rating debe ser entre 1 y 5' });
+      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
     }
 
     await pool.query(
-      'INSERT INTO ratings (producto_id, usuario_id, rating) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE rating = ?',
+      'INSERT INTO ratings (product_id, user_id, rating) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE rating = ?',
       [id, req.user.id, rating, rating]
     );
 
-    res.json({ message: 'Rating guardado', rating });
+    res.json({ message: 'Rating saved', rating });
   } catch (err) {
     console.error('Rate error:', err);
-    res.status(500).json({ error: 'Error al guardar rating' });
+    res.status(500).json({
+      error: 'Error saving rating',
+      details: err.message
+    });
   }
 });
 

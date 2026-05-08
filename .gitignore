@@ -1,2 +1,12 @@
+<<<<<<< HEAD
 node_modules/
 .env
+=======
+node_modules/
+.env
+.DS_Store
+npm-debug.log*
+yarn-error.log*
+logs/
+*.log
+>>>>>>> b8d2f72130106bb249885c9d1b00a35ddd06095d

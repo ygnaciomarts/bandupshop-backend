@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {
   "name": "bandup-shop-api",
   "version": "1.0.0",
@@ -20,3 +21,27 @@
     "nodemon": "^3.1.4"
   }
 }
+=======
+{
+  "name": "bandup-shop-api",
+  "version": "1.0.0",
+  "description": "BandUp Shop REST API",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.11.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}
+>>>>>>> b8d2f72130106bb249885c9d1b00a35ddd06095d

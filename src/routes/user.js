@@ -91,10 +91,10 @@ router.post('/reset-password/request', async (req, res) => {
       [hashedToken, expiresAt, user.id]
     );
 
-    const resetLink = `https://bandup.ygnaciomarts.com/reset-password?token=${rawToken}&email=${encodeURIComponent(normalizedEmail)}`;
+    const resetLink = `https://new-bandup.ygnaciomarts.com/reset-password?token=${rawToken}&email=${encodeURIComponent(normalizedEmail)}`;
 
     await transporter.sendMail({
-      from: `"BandUp Auth" <auth@ygnaciomarts.com>`,
+      from: `"BandUp Account Updates" <auth@ygnaciomarts.com>`,
       to: normalizedEmail,
       subject: 'Restablece tu contraseña',
       html: `

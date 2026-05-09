@@ -2,10 +2,51 @@ const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const pool = require('../config/database');
 const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
+
+const avatarsDir = path.join(__dirname, '../../uploads/avatars');
+
+if (!fs.existsSync(avatarsDir)) {
+  fs.mkdirSync(avatarsDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (_, __, cb) => {
+    cb(null, avatarsDir);
+  },
+  filename: (req, file, cb) => {
+    const extension = path.extname(file.originalname);
+    cb(null, `user-${req.user.id}-${Date.now()}${extension}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024
+  },
+  fileFilter: (_, file, cb) => {
+    const allowedTypes = [
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/webp',
+      'image/gif'
+    ];
+
+    if (!allowedTypes.includes(file.mimetype)) {
+      return cb(new Error('Formato de imagen no permitido'));
+    }
+
+    cb(null, true);
+  }
+});
 
 const transporter = nodemailer.createTransport({
   host: 'smtp.zoho.com',
@@ -27,7 +68,7 @@ router.get('/profile', requireAuth, async (req, res) => {
     }
 
     const [rows] = await pool.query(
-      `SELECT id, usuario, nombre, apellido, email, su
+      `SELECT id, usuario, nombre, apellido, email, su, creado, phone_number, avatar_url
        FROM usuarios
        WHERE id = ?
        LIMIT 1`,
@@ -44,6 +85,39 @@ router.get('/profile', requireAuth, async (req, res) => {
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
+
+// POST /avatar
+router.post(
+  '/avatar',
+  requireAuth,
+  upload.single('avatar'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'Imagen requerida' });
+      }
+
+      const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+
+      await pool.query(
+        `UPDATE usuarios
+         SET avatar_url = ?
+         WHERE id = ?`,
+        [avatarUrl, req.user.id]
+      );
+
+      return res.status(200).json({
+        success: true,
+        avatar_url: avatarUrl
+      });
+    } catch (err) {
+      console.error('Avatar upload error:', err);
+      return res.status(500).json({
+        error: 'Error al subir avatar'
+      });
+    }
+  }
+);
 
 // POST /reset-password/request
 router.post('/reset-password/request', async (req, res) => {

@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 
 const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/products');
@@ -29,6 +30,12 @@ app.use(cors({
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Static uploads
+app.use(
+  '/uploads',
+  express.static(path.join(__dirname, '../uploads'))
+);
 
 // Routes
 app.use('/auth', authRoutes);

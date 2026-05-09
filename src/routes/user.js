@@ -94,7 +94,7 @@ router.post('/reset-password/request', async (req, res) => {
     const resetLink = `https://bandup.ygnaciomarts.com/reset-password?token=${rawToken}&email=${encodeURIComponent(normalizedEmail)}`;
 
     await transporter.sendMail({
-      from: `"BandUp Auth" <auth@bandup.ygnaciomarts.com>`,
+      from: `"BandUp Auth" <auth@ygnaciomarts.com>`,
       to: normalizedEmail,
       subject: 'Restablece tu contraseña',
       html: `

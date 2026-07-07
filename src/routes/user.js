@@ -79,10 +79,49 @@ router.get('/profile', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
-    return res.status(200).json(rows[0]);
+    const userData = rows[0];
+    return res.status(200).json({ ...userData, isAdmin: Boolean(userData.su) });
   } catch (err) {
     console.error('Profile error:', err);
     return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// PUT /profile
+router.put('/profile', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { nombre, apellido, usuario, phone_number } = req.body;
+
+    if (!nombre || typeof nombre !== 'string' || nombre.trim().length === 0) {
+      return res.status(400).json({ error: 'El nombre es requerido' });
+    }
+
+    // Check username uniqueness if provided
+    if (usuario) {
+      const [existing] = await pool.query(
+        'SELECT id FROM usuarios WHERE usuario = ? AND id != ?',
+        [usuario.trim(), userId]
+      );
+      if (existing.length > 0) {
+        return res.status(409).json({ error: 'Ese nombre de usuario ya está en uso' });
+      }
+    }
+
+    await pool.query(
+      `UPDATE usuarios SET nombre = ?, apellido = ?, usuario = ?, phone_number = ? WHERE id = ?`,
+      [nombre.trim(), (apellido || '').trim(), (usuario || '').trim(), (phone_number || '').trim(), userId]
+    );
+
+    const [rows] = await pool.query(
+      'SELECT id, usuario, nombre, apellido, email, su, creado, phone_number, avatar_url FROM usuarios WHERE id = ?',
+      [userId]
+    );
+
+    res.json({ success: true, user: rows[0] });
+  } catch (err) {
+    console.error('Update profile error:', err);
+    res.status(500).json({ error: 'Error al actualizar perfil' });
   }
 });
 
@@ -258,6 +297,49 @@ router.post('/reset-password/confirm', async (req, res) => {
     });
   } catch (err) {
     console.error('Reset password confirm error:', err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// POST /change-password (authenticated)
+router.post('/change-password', requireAuth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Contraseña actual y nueva son requeridas' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
+    }
+
+    const [rows] = await pool.query(
+      'SELECT id, password FROM usuarios WHERE id = ? LIMIT 1',
+      [req.user.id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    const user = rows[0];
+    const isValid = await bcrypt.compare(currentPassword, user.password);
+
+    if (!isValid) {
+      return res.status(400).json({ error: 'La contraseña actual es incorrecta' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await pool.query(
+      'UPDATE usuarios SET password = ? WHERE id = ?',
+      [hashedPassword, req.user.id]
+    );
+
+    return res.status(200).json({ success: true, message: 'Contraseña actualizada correctamente' });
+  } catch (err) {
+    console.error('Change password error:', err);
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
 });

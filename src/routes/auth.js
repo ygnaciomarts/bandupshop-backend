@@ -15,7 +15,7 @@ router.post('/login', async (req, res) => {
     }
 
     const [rows] = await pool.query(
-      'SELECT id, usuario, password, nombre, apellido, email, su FROM usuarios WHERE usuario = ?',
+      'SELECT id, usuario, password, nombre, apellido, email, su, avatar_url FROM usuarios WHERE usuario = ?',
       [username]
     );
 
@@ -39,7 +39,9 @@ router.post('/login', async (req, res) => {
         nombre: user.nombre,
         apellido: user.apellido,
         email: user.email,
-        su: user.su
+        su: user.su,
+        isAdmin: Boolean(user.su),
+        avatar_url: user.avatar_url || null
       }
     });
   } catch (err) {
@@ -81,7 +83,7 @@ router.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     try {
       const [result] = await pool.query(
-        'INSERT INTO usuarios (usuario, email, password, nombre, apellido) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO usuarios (usuario, email, password, nombre, apellido, creado, modificado) VALUES (?, ?, ?, ?, ?, NOW(), NOW())',
         [username, email, hashedPassword, nombre, apellido || '']
       );
 
@@ -116,34 +118,6 @@ router.post('/register', async (req, res) => {
 // POST /api/auth/logout
 router.post('/logout', (req, res) => {
   res.json({ message: 'Sesión cerrada' });
-});
-
-// GET /api/auth/me
-router.get('/me', requireAuth, async (req, res) => {
-  try {
-    const [rows] = await pool.query(
-      'SELECT id, usuario, nombre, apellido, email, su, img FROM usuarios WHERE id = ?',
-      [req.user.id]
-    );
-
-    const user = rows[0];
-    if (!user) {
-      return res.status(404).json({ error: 'Usuario no encontrado' });
-    }
-
-    res.json({
-      id: user.id,
-      username: user.usuario,
-      nombre: user.nombre,
-      apellido: user.apellido,
-      email: user.email,
-      su: user.su,
-      avatar: user.img ? Buffer.from(user.img).toString('base64') : null
-    });
-  } catch (err) {
-    console.error('Me error:', err);
-    res.status(500).json({ error: 'Error interno del servidor' });
-  }
 });
 
 module.exports = router;
